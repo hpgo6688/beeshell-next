@@ -14,44 +14,39 @@ export interface IconProps {
   source?: ImageSourcePropType
 }
 
-export class Icon extends React.Component<IconProps, any> {
-  static displayName = 'Icon'
-  static defaultProps = {
-    type: 'angle-down',
-    size: 14,
-    style: {},
-    tintColor: variables.mtdBrandPrimaryDark,
-    source: null
+export const Icon: React.FC<IconProps> = ({
+  type = 'angle-down',
+  size = 14,
+  style = {},
+  tintColor = variables.mtdBrandPrimaryDark,
+  source = null
+}) => {
+  const mainStyle = {
+    tintColor,
+    width: size,
+    height: size
   }
 
-  render () {
-    let { type, size, style, tintColor, source } = this.props
-
-    const mainStyle = {
-      tintColor,
-      width: size,
-      height: size
-    }
-
-    if (size == null) {
-      delete mainStyle.width
-      delete mainStyle.height
-    }
-
-    if (!source) {
-      source = require(`../../common/images/icons/${type}.png`)
-    }
-
-    return (
-      <Image
-        style={[
-          style,
-          {
-            ...mainStyle
-          }
-        ]}
-        source={source}
-      />
-    )
+  if (size == null) {
+    delete mainStyle.width
+    delete mainStyle.height
   }
+
+  if (!source) {
+    source = require(`../../common/images/icons/${type}.png`)
+  }
+
+  return (
+    <Image
+      style={[
+        style,
+        {
+          ...mainStyle
+        }
+      ]}
+      source={source}
+    />
+  )
 }
+
+Icon.displayName = 'Icon'
