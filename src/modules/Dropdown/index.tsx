@@ -1,9 +1,9 @@
-import React, { ReactElement } from 'react'
-
+import React, { ReactElement, useRef, useMemo, useCallback } from 'react'
 import {
   ViewStyle,
   ScrollView,
-  Animated
+  Animated,
+  StyleProp
 } from 'react-native'
 import { SlideModal, SlideModalProps } from '../../components/SlideModal'
 import { Radio } from '../../components/Radio'
@@ -11,123 +11,146 @@ import dropdownStyles from './styles'
 import variables from '../../common/styles/variables'
 import { SlideAnimated } from '../../common/animations'
 
+type Direction = 'up' | 'down'
+
 interface OptionItem {
-  label: string,
-  [propName: string]: any
-}
-
-export interface DropdownProps extends SlideModalProps {
-  testID?: string
-  style?: ViewStyle
-  direction?: 'up' | 'down'
-  data: Array<OptionItem>
+  label: string
   value: any
-  checkedIcon?: ReactElement<any>
-  uncheckedIcon?: ReactElement<any>
-  onChange: Function
+  testID?: string
+  [key: string]: any
 }
 
-export class Dropdown extends React.Component<DropdownProps> {
-  private slideModal = null
-  private animated = null
+export interface DropdownProps extends Omit<SlideModalProps, 'direction'> {
+  testID?: string
+  style?: StyleProp<ViewStyle>
+  direction?: Direction
+  data: OptionItem[]
+  value: any
+  checkedIcon?: ReactElement
+  uncheckedIcon?: ReactElement
+  onChange: (value: any) => void
+  cancelable?: boolean
+  fullScreenPatch?: boolean[] | null
+}
 
-  static defaultProps = {
-    ...SlideModal.defaultProps,
-    cancelable: false,
-    direction: 'down',
-    fullScreenPatch: null,
-    data: []
-  }
+const getFullScreenPatch = (direction: Direction): boolean[] => 
+  direction === 'down' ? [true, false, false] : [false, false, true]
 
-  constructor (props) {
-    super(props)
+const DropdownContent: React.FC<{
+  data: OptionItem[]
+  value: any
+  onChange: (value: any) => void
+  checkedIcon?: ReactElement
+  uncheckedIcon?: ReactElement
+  style?: StyleProp<ViewStyle>
+  animatedStyle?: any
+  onClose: () => void
+}> = ({
+  data,
+  value,
+  onChange,
+  checkedIcon,
+  uncheckedIcon,
+  style,
+  animatedStyle,
+  onClose
+}) => (
+  <ScrollView style={[dropdownStyles.container, style]}>
+    <Animated.View style={animatedStyle}>
+      <Radio
+        checkedIcon={checkedIcon}
+        uncheckedIcon={uncheckedIcon}
+        value={value}
+        onChange={(newValue) => {
+          onClose()
+          onChange(newValue)
+        }}>
+        {data.map((item, index) => (
+          <Radio.Item
+            testID={item.testID}
+            key={index}
+            label={item.label}
+            value={item.value}
+          />
+        ))}
+      </Radio>
+    </Animated.View>
+  </ScrollView>
+)
 
+export const Dropdown: React.FC<DropdownProps> = ({
+  direction = 'down',
+  fullScreenPatch,
+  offsetX,
+  offsetY,
+  cancelable = false,
+  data = [],
+  value,
+  onChange,
+  checkedIcon,
+  uncheckedIcon,
+  style,
+  ...restProps
+}) => {
+  const slideModalRef = useRef<any>(null)
+  const animatedRef = useRef<SlideAnimated | null>(null)
+
+  const animatedStyle = useMemo(() => {
+    if (!animatedRef.current) return {}
+    
+    return {
+      transform: [
+        { translateX: animatedRef.current.getState().translateX },
+        { translateY: animatedRef.current.getState().translateY }
+      ],
+      opacity: animatedRef.current.getState().opacity
+    }
+  }, [])
+
+  useMemo(() => {
     if (variables.dropdownEnableAnimated) {
-      this.animated = new SlideAnimated({
+      animatedRef.current = new SlideAnimated({
         directionType: ['vertical'],
         duration: 1000,
         translateYList: [
-          props.direction === 'down' ? -20 : 20,
+          direction === 'down' ? -20 : 20,
           0,
         ]
       })
     }
-  }
+  }, [direction])
 
-  open () {
-    this.animated && this.animated.toIn()
-    return this.slideModal.open()
-  }
+  const open = useCallback(() => {
+    animatedRef.current?.toIn()
+    return slideModalRef.current?.open()
+  }, [])
 
-  close () {
-    return this.slideModal.close()
-  }
+  const close = useCallback(() => {
+    return slideModalRef.current?.close()
+  }, [])
 
-  getContent () {
-    const { data, value, onChange, checkedIcon, uncheckedIcon } = this.props
+  const computedFullScreenPatch = fullScreenPatch || getFullScreenPatch(direction)
 
-    let animatedStyle: any = {}
-    if (this.animated) {
-      animatedStyle = {
-        transform: [
-          { translateX: this.animated.getState().translateX },
-          { translateY: this.animated.getState().translateY }
-        ],
-        opacity: this.animated.getState().opacity
-      }
-    }
-
-    return (
-      <ScrollView
-        style={[
-          dropdownStyles.container,
-          this.props.style
-        ]}>
-        <Animated.View style={animatedStyle}>
-          <Radio
-            checkedIcon={checkedIcon}
-            uncheckedIcon={uncheckedIcon}
-            value={value}
-            onChange={(value) => {
-              this.slideModal.close()
-              onChange(value)
-            }}>
-
-            {
-              data.map((item, index) => {
-                return (
-                  <Radio.Item
-                    testID={item.testID}
-                    key={index}
-                    label={item.label}
-                    value={item.value}>
-                  </Radio.Item>
-                )
-              })
-            }
-          </Radio>
-        </Animated.View>
-      </ScrollView>
-    )
-  }
-
-  render () {
-    const { direction } = this.props
-    const fullScreenPatch = this.props.fullScreenPatch || (
-      direction === 'down' ? [true, false, false] : [false, false, true]
-    )
-    return (
-      <SlideModal<SlideModalProps>
-        ref={c => {
-          this.slideModal = c
-        }}
-        fullScreenPatch={fullScreenPatch}
-        direction={this.props.direction}
-        offsetX={this.props.offsetX}
-        offsetY={this.props.offsetY}
-        cancelable={this.props.cancelable}>
-        { this.getContent() }
-      </SlideModal>
-    )
-  }
+  return (
+    <SlideModal
+      ref={slideModalRef}
+      fullScreenPatch={computedFullScreenPatch}
+      direction={direction}
+      offsetX={offsetX}
+      offsetY={offsetY}
+      cancelable={cancelable}
+      {...restProps}>
+      <DropdownContent
+        data={data}
+        value={value}
+        onChange={onChange}
+        checkedIcon={checkedIcon}
+        uncheckedIcon={uncheckedIcon}
+        style={style}
+        animatedStyle={animatedStyle}
+        onClose={close}
+      />
+    </SlideModal>
+  )
 }
+
